@@ -30,7 +30,7 @@ export TRANSFORMERS_CACHE=/home/alison.lobo/llama32_qlora/models/hf_cache
 # Variables de control del entrenamiento
 # --------------------------------------------------
 export MODEL="meta-llama/Llama-3.2-1B-Instruct"          # ✅ modelo base
-export DATA="/home/alison.lobo/llama32_qlora/pdfs_uned.jsonl"
+export DATA="/home/alison.lobo/llama32_qlora/base.jsonl"
 export MAX_STEPS=0          # 0 = sin límite de pasos, usa épocas completas
 export EPOCHS=60             # número de épocas completas
 export EVAL_STEPS=200       # evalúa cada 200 pasos
