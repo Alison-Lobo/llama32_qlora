@@ -12,7 +12,7 @@ from transformers import EarlyStoppingCallback
 # Configuración general
 # =====================
 MODEL_NAME  = os.getenv("MODEL",  "meta-llama/Llama-3.2-1B-Instruct")
-DATASET     = os.getenv("DATA",   "/home/alison.lobo/llama32_qlora/pdfs_uned.jsonl")
+DATASET     = os.getenv("DATA",   "/home/alison.lobo/llama32_qlora/base.jsonl")
 OUTPUT_DIR  = os.getenv("OUT",    "/home/alison.lobo/llama32_qlora/outputs/llama32_block1_full")
 MAX_STEPS   = int(os.getenv("MAX_STEPS", "1500"))
 EVAL_STEPS  = int(os.getenv("EVAL_STEPS", "200"))
