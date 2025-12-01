@@ -175,7 +175,7 @@ less ~/llama32_qlora/scripts/train_block_full_gpu.sbatch
 ## ⚠️ Notes
 
 Dataset is not included for privacy and licensing reasons.  
-Academic project (UCR, TICAL, HPC-UCR).
+Academic project (UCR, HPC-UCR).
 
 ---
 
