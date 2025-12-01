@@ -166,7 +166,7 @@ less ~/llama32_qlora/scripts/train_block_full_gpu.sbatch
 | File                         | Description |
 |-----------------------------|-------------|
 | `adapter_model.safetensors` | QLoRA adapters |
-| `training_summary_full.json`| Final metrics |
+| `llama32_qlora_full_28137.out`| Final metrics |
 | `tokenizer.json`            | Tokenizer used |
 | `*.out` / `*.err`           | HPC-UCR logs |
 
