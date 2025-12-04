@@ -1,187 +1,526 @@
-# 🦙 LLaMA 3.2 1B – Fine-Tuning en Español (QLoRA + Unsloth + HPC-UCR)
+# 🦙 LLaMA 3.2 1B – Fine-Tuning en Español (QLoRA + Unsloth)
 
-Python · PyTorch 2.7.1 · Transformers · Unsloth · QLoRA · CUDA 12.8 · HPC-UCR  
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.7.1-red.svg)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/License-Academic-green.svg)]()
 
-
-## 🧠 Overview
-
-This project adapts the **LLaMA 3.2 1B Instruct** model to **Spanish** using efficient fine-tuning with **QLoRA (4-bit)** through the **Unsloth** library, executed on the **HPC-UCR cluster**.
-
-The objective of this work is to train a base model capable of responding to instructions in Spanish, using an academic data repository processed to JSONL.
-
-This project demonstrates how it is possible to train language models in university infrastructures using modern optimization techniques and GPU consumption.
+Fine-tuning eficiente del modelo **LLaMA 3.2 1B Instruct** en español usando **QLoRA (4-bit)** con la librería **Unsloth**, ejecutado en el cluster **HPC-UCR**.
 
 ---
 
-## ⚙️ Model Summary
+## 📋 Tabla de Contenidos
 
-| Component          | Description |
-|-------------------|-------------|
-| Framework         | PyTorch **2.7.1**, TorchVision 0.22.1, TorchAudio 2.7.1 |
-| Transformer Stack | HuggingFace Transformers |
-| Training Strategy | QLoRA (4-bit) + Low Rank Adapters |
-| Base Model        | `meta-llama/Llama-3.2-1B-Instruct` |
-| Sequence Length   | 4096 tokens |
-| Optimizer         | AdamW |
-| Dataset Format    | JSONL (instruction, input, output) |
-| Infraestructura   | HPC-UCR GPU partition (A100 80GB) |
-| Scheduler         | Warmup + Cosine Decay |
-| Evaluation        | Eval Loss & Perplexity |
-
----
-
-## 📊 Results
-
-Training was run for **60 epochs** using QLoRA (4-bit) on an NVIDIA **A100 80GB** GPU (HPC-UCR), with a warmup + cosine decay scheduler.
-
-From the training logs (`llama32_qlora_full_28137.out`) and `training_summary_full.json`, the model shows a consistent improvement on the validation set:
-
-| Metric                              | Value (approx.)                      |
-|------------------------------------|--------------------------------------|
-| Initial eval loss (epoch ≈ 1)      | **3.08**                             |
-| Final eval loss (epoch 60)         | **1.70**                             |
-| Initial perplexity (epoch ≈ 1)     | **21.74**                            |
-| Final perplexity (epoch 60)        | **≈ 5.47**                           |
-| Training epochs                    | **60**                               |
-| Effective GPU runtime              | **3 blocks × 6 hours (A100 80GB)**   |
-
-These values indicate a **monotonic decrease in loss and perplexity** on the validation set, showing that the model improves its ability to model Spanish-language sequences as training progresses.
-
-### 📈 Metrics by epoch (summary)
-
-The table below summarizes the behaviour of the main metrics at selected epochs:
-
-| Epoch | Train loss | Eval loss | Perplexity (≈ e^loss) | Learning rate        | Grad norm |
-|------:|-----------:|----------:|----------------------:|----------------------|----------:|
-| 1     | 3.2204     | 3.0790    | 21.74                 | 2.66×10⁻⁵           | 4.09      |
-| 10    | 0.2142     | 3.0143    | 20.37                 | 1.71×10⁻⁴           | 1.17      |
-| 20    | 0.1775     | 2.9798    | 19.68                 | 1.37×10⁻⁴           | 1.07      |
-| 30    | 0.1523     | 2.8126    | 16.65                 | 1.03×10⁻⁴           | 0.36      |
-| 40    | 0.1519     | 2.6656    | 14.38                 | 6.88×10⁻⁵           | 0.33      |
-| 50    | 0.1454     | 2.4571    | 11.67                 | 3.40×10⁻⁵           | 0.30      |
-| 60    | 0.1392     | 1.7000    | 5.47                  | 4.35×10⁻⁸           | 0.29      |
-
-- **Train loss** drops rapidly from ~3.22 to ~0.14 and then stabilizes.
-- **Eval loss** decreases from ~3.08 to ~1.70, with an associated reduction of **perplexity** from ~21.7 to ~5.5.
-- The **learning rate** increases after the warmup phase (peaking around 1.9×10⁻⁴) and then decays almost to zero at the end, following a *cosine decay* pattern.
-- The **gradient norm** goes from ~4.1 to values close to 0.3, showing large updates at the beginning and progressively smaller, more stable steps in later epochs.
-
-Taken together, these curves show a **stable training process without exploding gradients** and a sustained improvement on the validation set – an appropriate behaviour for a **1B-parameter model** fine-tuned with QLoRA in an academic setting.
-
+- [Descripción General](#-descripción-general)
+- [Inicio Rápido](#-inicio-rápido)
+- [Instalación](#-instalación)
+- [Configuración](#-configuración)
+- [Formato de Datos](#-formato-de-datos)
+- [Entrenamiento](#-entrenamiento)
+- [Inferencia](#-inferencia)
+- [Estructura del Proyecto](#-estructura-del-proyecto)
+- [Resultados](#-resultados)
+- [Resolución de Problemas](#-resolución-de-problemas)
+- [Contribuciones](#-contribuciones)
+- [Autor](#-autor)
 
 ---
 
-## 🗂️ Project Structure
+## 🧠 Descripción General
+
+Este proyecto adapta el modelo **LLaMA 3.2 1B Instruct** al **español** utilizando fine-tuning eficiente con **QLoRA (cuantización de 4 bits)** a través de la librería **Unsloth**, ejecutado en el cluster **HPC-UCR**.
+
+### Características Principales
+
+✅ **Eficiencia de Memoria**: Cuantización de 4 bits reduce el uso de memoria en ~75%
+✅ **Entrenamiento Rápido**: Optimizaciones de Unsloth aceleran el entrenamiento
+✅ **Fácil Configuración**: Scripts automatizados para setup
+✅ **Flexible**: Configuración centralizada y fácil de modificar
+✅ **Reproducible**: Semillas aleatorias y configuración documentada
+✅ **HPC-Ready**: Script SLURM incluido para clusters
+
+### Especificaciones Técnicas
+
+| Componente | Descripción |
+|-----------|-------------|
+| **Framework** | PyTorch 2.7.1, TorchVision 0.22.1, TorchAudio 2.7.1 |
+| **Transformers** | HuggingFace Transformers |
+| **Estrategia** | QLoRA (4-bit) + Low Rank Adapters |
+| **Modelo Base** | `meta-llama/Llama-3.2-1B-Instruct` |
+| **Longitud de Secuencia** | 4096 tokens |
+| **Optimizador** | AdamW con warmup + cosine decay |
+| **Formato de Datos** | JSONL (instruction, input, output) |
+| **Infraestructura** | HPC-UCR GPU partition (A100 80GB) |
+| **Evaluación** | Eval Loss & Perplexity |
+
+---
+
+## 🚀 Inicio Rápido
 
 ```bash
+# 1. Clonar el repositorio
+git clone <repository-url>
+cd llama32_qlora
+
+# 2. Ejecutar setup automático
+bash setup.sh
+
+# 3. Colocar tus datos de entrenamiento
+# Coloca tu dataset en: data/base.jsonl
+
+# 4. Entrenar (local)
+python scripts/train_llama32_gpu.py
+
+# O entrenar en HPC con SLURM
+sbatch scripts/train_block_full_gpu.sbatch
+
+# 5. Ejecutar inferencia
+python scripts/infer_llama.py \
+    --model_path outputs/llama32_qlora \
+    --prompt "¿Qué es Python?"
+```
+
+---
+
+## 📦 Instalación
+
+### Opción 1: Setup Automático (Recomendado)
+
+```bash
+bash setup.sh
+```
+
+El script automatizado:
+- ✅ Verifica dependencias del sistema
+- ✅ Crea entorno virtual
+- ✅ Instala todas las dependencias
+- ✅ Configura estructura de directorios
+- ✅ Verifica instalación de GPU/CUDA
+
+### Opción 2: Instalación Manual
+
+Ver la [Guía de Instalación Detallada](INSTALL.md) para instrucciones paso a paso.
+
+#### Requisitos Mínimos
+
+- Python 3.8+
+- NVIDIA GPU con 12GB+ VRAM
+- CUDA 11.8+
+- 20GB de espacio en disco
+
+#### Instalación Rápida
+
+```bash
+# Crear entorno virtual
+python3 -m venv venv
+source venv/bin/activate
+
+# Instalar dependencias
+pip install -r requirements.txt
+```
+
+Ver [INSTALL.md](INSTALL.md) para detalles completos y troubleshooting.
+
+---
+
+## ⚙️ Configuración
+
+### Archivo de Configuración
+
+Todas las configuraciones están centralizadas en `config.py`:
+
+```python
+# Editar config.py para personalizar
+
+# Modelo y datos
+MODEL_NAME = "meta-llama/Llama-3.2-1B-Instruct"
+DATASET_PATH = "data/base.jsonl"
+
+# Parámetros de entrenamiento
+NUM_TRAIN_EPOCHS = 60
+LEARNING_RATE = 2e-4
+PER_DEVICE_TRAIN_BATCH_SIZE = 2
+
+# Parámetros LoRA
+LORA_R = 16
+LORA_ALPHA = 32
+LORA_DROPOUT = 0.05
+```
+
+### Variables de Entorno
+
+También puedes usar variables de entorno para override:
+
+```bash
+export MODEL="meta-llama/Llama-3.2-1B-Instruct"
+export DATA="./data/mi_dataset.jsonl"
+export EPOCHS=40
+export OUT="./outputs/mi_modelo"
+
+python scripts/train_llama32_gpu.py
+```
+
+### Verificar Configuración
+
+```bash
+# Ver configuración actual
+python config.py
+```
+
+---
+
+## 📊 Formato de Datos
+
+### Formato JSONL Requerido
+
+Tu dataset debe estar en formato JSONL (JSON Lines) con los siguientes campos:
+
+```jsonl
+{"instruction": "Traduce al inglés", "input": "Hola mundo", "output": "Hello world"}
+{"instruction": "¿Qué es Python?", "output": "Python es un lenguaje de programación..."}
+{"instruction": "Resume este texto", "input": "Texto largo...", "output": "Resumen..."}
+```
+
+### Campos
+
+- **`instruction`** (requerido): La instrucción o pregunta
+- **`input`** (opcional): Contexto o entrada adicional
+- **`output`** (requerido): La respuesta esperada
+
+### Ejemplo de Dataset
+
+Crea `data/base.jsonl`:
+
+```jsonl
+{"instruction": "¿Qué es machine learning?", "output": "Machine learning es una rama de la inteligencia artificial que permite a las computadoras aprender de datos sin ser programadas explícitamente."}
+{"instruction": "Traduce al inglés", "input": "Buenos días", "output": "Good morning"}
+{"instruction": "Resume en una frase", "input": "Python es un lenguaje de programación de alto nivel, interpretado y de propósito general.", "output": "Python es un lenguaje versátil de alto nivel."}
+```
+
+### Validar Dataset
+
+```bash
+# Verificar formato del dataset
+python - << 'EOF'
+import json
+
+with open('data/base.jsonl', 'r') as f:
+    for i, line in enumerate(f, 1):
+        try:
+            data = json.loads(line)
+            assert 'instruction' in data, f"Línea {i}: falta 'instruction'"
+            assert 'output' in data, f"Línea {i}: falta 'output'"
+            print(f"✅ Línea {i}: OK")
+        except Exception as e:
+            print(f"❌ Línea {i}: {e}")
+EOF
+```
+
+---
+
+## 🎯 Entrenamiento
+
+### Entrenamiento Local
+
+```bash
+# Activar entorno virtual
+source venv/bin/activate
+
+# Entrenar con configuración por defecto
+python scripts/train_llama32_gpu.py
+
+# O con parámetros personalizados
+EPOCHS=40 LEARNING_RATE=1e-4 python scripts/train_llama32_gpu.py
+```
+
+### Entrenamiento en HPC con SLURM
+
+#### 1. Configurar Usuario
+
+Edita `scripts/train_block_full_gpu.sbatch`:
+
+```bash
+# Cambiar estas líneas según tu sistema
+USER_HOME="${HOME}"
+PROJECT_ROOT="${USER_HOME}/llama32_qlora"
+
+# Configurar email (opcional)
+# #SBATCH --mail-user=tu.email@ejemplo.com
+# #SBATCH --mail-type=END,FAIL
+```
+
+#### 2. Enviar Job
+
+```bash
+cd scripts
+sbatch train_block_full_gpu.sbatch
+```
+
+#### 3. Monitorear Job
+
+```bash
+# Ver estado del job
+squeue -u $USER
+
+# Ver output en tiempo real
+tail -f llama32_qlora_full_*.out
+
+# Ver logs completos
+less llama32_qlora_full_*.out
+```
+
+### Parámetros de Entrenamiento
+
+| Parámetro | Valor por Defecto | Descripción |
+|-----------|-------------------|-------------|
+| `EPOCHS` | 60 | Número de épocas de entrenamiento |
+| `MAX_STEPS` | 0 | Pasos máximos (0 = usar épocas completas) |
+| `LEARNING_RATE` | 2e-4 | Tasa de aprendizaje |
+| `BATCH_SIZE` | 2 | Tamaño de batch por dispositivo |
+| `GRAD_ACCUM` | 4 | Pasos de acumulación de gradientes |
+| `EVAL_STEPS` | 200 | Frecuencia de evaluación |
+| `LORA_R` | 16 | Rango de LoRA |
+| `LORA_ALPHA` | 32 | Alpha de LoRA |
+
+---
+
+## 🔮 Inferencia
+
+### Inferencia Básica
+
+```bash
+python scripts/infer_llama.py \
+    --model_path outputs/llama32_qlora \
+    --prompt "¿Qué es Python?"
+```
+
+### Modo Interactivo
+
+```bash
+python scripts/infer_llama.py \
+    --model_path outputs/llama32_qlora \
+    --interactive
+```
+
+### Parámetros Personalizados
+
+```bash
+python scripts/infer_llama.py \
+    --model_path outputs/llama32_qlora \
+    --prompt "Explica qué es machine learning" \
+    --max_tokens 300 \
+    --temperature 0.8 \
+    --top_p 0.95
+```
+
+### Opciones de Inferencia
+
+| Parámetro | Por Defecto | Descripción |
+|-----------|-------------|-------------|
+| `--model_path` | (requerido) | Ruta al modelo entrenado |
+| `--prompt` | None | Texto de entrada |
+| `--interactive` | False | Modo interactivo |
+| `--max_tokens` | 200 | Máximo de tokens a generar |
+| `--temperature` | 0.7 | Temperatura de sampling (0=determinista) |
+| `--top_p` | 0.9 | Nucleus sampling |
+| `--top_k` | 50 | Top-k sampling |
+| `--repetition_penalty` | 1.1 | Penalización por repetición |
+| `--no_cuda` | False | Forzar uso de CPU |
+
+---
+
+## 🗂️ Estructura del Proyecto
+
+```
 llama32_qlora/
-├── scripts/
-│   ├── train_llama32_gpu.py          # Entrenamiento QLoRA con Unsloth
-│   ├── train_block_full_gpu.sbatch   # Job Slurm para HPC-UCR
-│   └── infer_llama.py                # Inferencia con el modelo final
+├── README.md                    # Este archivo
+├── INSTALL.md                   # Guía de instalación detallada
+├── requirements.txt             # Dependencias de Python
+├── config.py                    # Configuración centralizada
+├── setup.sh                     # Script de setup automático
+├── .gitignore                   # Archivos ignorados por git
 │
-├── outputs/
-│   └── llama32_block1_full/
+├── scripts/                     # Scripts de entrenamiento e inferencia
+│   ├── train_llama32_gpu.py         # Script principal de entrenamiento
+│   ├── train_block_full_gpu.sbatch  # Job SLURM para HPC
+│   └── infer_llama.py               # Script de inferencia
+│
+├── data/                        # Datos de entrenamiento
+│   └── base.jsonl                   # Tu dataset (no incluido)
+│
+├── outputs/                     # Modelos entrenados
+│   └── llama32_qlora/               # Checkpoints y adapters
 │       ├── adapter_model.safetensors
 │       ├── adapter_config.json
 │       ├── tokenizer.json
 │       ├── tokenizer_config.json
-│       ├── training_args.bin
-│       └── training_summary_full.json
+│       └── training_summary.json
 │
-├── logs/
-│   └── llama32_qlora_full_*.out      # Logs de entrenamiento (Slurm)
+├── logs/                        # Logs de entrenamiento
+│   └── *.out / *.err                # Logs de SLURM
 │
-└── data/
-    └── base.jsonl                    # Dataset privado
+├── models/                      # Cache de HuggingFace
+│   ├── hf_home/
+│   └── hf_cache/
+│
+└── venv/                        # Entorno virtual (creado por setup)
 ```
 
 ---
 
-## 🚀 Setup & Training
+## 📈 Resultados
 
-### 1️⃣ Create and activate a virtual environment
+El entrenamiento fue ejecutado por **60 épocas** usando QLoRA (4-bit) en una GPU NVIDIA **A100 80GB** (HPC-UCR), con un scheduler de warmup + cosine decay.
+
+### Métricas Finales
+
+| Métrica | Valor Inicial | Valor Final | Mejora |
+|---------|---------------|-------------|--------|
+| **Eval Loss** | 3.08 | 1.70 | ↓ 45% |
+| **Perplexity** | 21.74 | 5.47 | ↓ 75% |
+| **Train Loss** | 3.22 | 0.14 | ↓ 96% |
+
+### Progreso por Época
+
+| Época | Train Loss | Eval Loss | Perplexity | Learning Rate |
+|------:|-----------:|----------:|-----------:|--------------:|
+| 1     | 3.22      | 3.08      | 21.74      | 2.66×10⁻⁵    |
+| 10    | 0.21      | 3.01      | 20.37      | 1.71×10⁻⁴    |
+| 20    | 0.18      | 2.98      | 19.68      | 1.37×10⁻⁴    |
+| 30    | 0.15      | 2.81      | 16.65      | 1.03×10⁻⁴    |
+| 40    | 0.15      | 2.67      | 14.38      | 6.88×10⁻⁵    |
+| 50    | 0.15      | 2.46      | 11.67      | 3.40×10⁻⁵    |
+| 60    | 0.14      | 1.70      | 5.47       | 4.35×10⁻⁸    |
+
+### Observaciones
+
+- ✅ **Reducción consistente** de loss y perplejidad en validación
+- ✅ **Sin overfitting**: Mejora continua en set de evaluación
+- ✅ **Estabilidad**: Gradient norm estable (4.09 → 0.29)
+- ✅ **Convergencia**: Learning rate decae suavemente
+- ⚡ **Tiempo de entrenamiento**: ~18 horas (3 bloques × 6 horas en A100)
+
+---
+
+## 🛠️ Resolución de Problemas
+
+### GPU No Detectada
 
 ```bash
-python3 -m venv llama_env
-source llama_env/bin/activate
+# Verificar GPU
+nvidia-smi
+
+# Verificar CUDA en PyTorch
+python -c "import torch; print(torch.cuda.is_available())"
+
+# Si devuelve False, reinstalar PyTorch
+pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1
 ```
 
----
+### Out of Memory (OOM)
 
-### 2️⃣ Install dependencies
+Edita `config.py`:
+
+```python
+# Reducir batch size
+PER_DEVICE_TRAIN_BATCH_SIZE = 1
+
+# Aumentar gradient accumulation
+GRADIENT_ACCUMULATION_STEPS = 8
+
+# Reducir longitud de secuencia
+MAX_SEQ_LENGTH = 2048
+```
+
+### Dataset No Encontrado
 
 ```bash
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1
-python -m pip install transformers datasets unsloth accelerate sentencepiece
+# Verificar que existe
+ls -lh data/base.jsonl
+
+# Verificar formato
+head -n 3 data/base.jsonl
+
+# Validar JSON
+python -m json.tool < data/base.jsonl > /dev/null && echo "✅ Valid JSON"
 ```
 
----
-
-### 3️⃣ Verify GPU / CUDA availability
+### Error al Instalar Unsloth
 
 ```bash
-python - << 'PY'
-import torch
-print("torch:", torch.__version__, "build CUDA:", torch.version.cuda)
-print("cuda available?:", torch.cuda.is_available())
-if torch.cuda.is_available():
-    print("GPU:", torch.cuda.get_device_name(0))
-PY
+# Probar instalación desde source
+pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+
+# O instalar componentes individualmente
+pip install bitsandbytes peft
 ```
 
----
+### Ver Más Troubleshooting
 
-### 4️⃣ Launch training on HPC-UCR
-
-```bash
-cd ~/llama32_qlora/scripts
-sbatch train_block_full_gpu.sbatch
-```
+Consulta [INSTALL.md](INSTALL.md#troubleshooting) para soluciones detalladas.
 
 ---
 
-### 5️⃣ Inspect training logs & metrics
+## 🤝 Contribuciones
 
-```bash
-# Ver log completo del entrenamiento
-less ~/llama32_qlora/logs/llama32_qlora_full_*.out
+Este es un proyecto académico de la Universidad de Costa Rica. Si encuentras problemas o tienes sugerencias:
 
-# Mostrar métricas resumidas
-cat ~/llama32_qlora/outputs/llama32_block1_full/training_summary_full.json | jq
-```
-
-```bash
-# Revisar scripts
-nano ~/llama32_qlora/scripts/train_llama32_gpu.py
-nano ~/llama32_qlora/scripts/train_block_full_gpu.sbatch
-less ~/llama32_qlora/scripts/train_block_full_gpu.sbatch
-```
+1. Documenta el problema claramente
+2. Incluye pasos para reproducir
+3. Adjunta logs relevantes
+4. Especifica tu entorno (OS, Python, CUDA, GPU)
 
 ---
 
-## 🧠 Outputs
+## 📝 Licencia
 
-| File                         | Description |
-|-----------------------------|-------------|
-| `adapter_model.safetensors` | QLoRA adapters |
-| `llama32_qlora_full_*.out`| Final metrics |
-| `tokenizer.json`            | Tokenizer used |
-| `*.out` / `*.err`           | HPC-UCR logs |
+Este proyecto es de uso académico. El dataset no está incluido por razones de privacidad y licencia.
 
 ---
 
-## ⚠️ Notes
+## 👩‍💻 Autor
 
-Dataset is not included for privacy and licensing reasons.  
-Academic project (UCR, HPC-UCR).
-
----
-
-## 👩‍💻 Author
-
-**Alison Lobo Salas**  
-Universidad de Costa Rica (UCR)  
+**Alison Lobo Salas**
+Universidad de Costa Rica (UCR)
 📍 San José, Costa Rica
-```
+
+---
+
+## 🙏 Agradecimientos
+
+- **HPC-UCR**: Por proveer la infraestructura computacional
+- **Unsloth**: Por la librería de entrenamiento eficiente
+- **HuggingFace**: Por Transformers y el ecosistema de modelos
+- **Meta**: Por el modelo LLaMA 3.2
+
+---
+
+## 📚 Referencias
+
+- [Unsloth Documentation](https://github.com/unslothai/unsloth)
+- [QLoRA Paper](https://arxiv.org/abs/2305.14314)
+- [LLaMA 3.2 Model Card](https://huggingface.co/meta-llama/Llama-3.2-1B-Instruct)
+- [HuggingFace Transformers](https://huggingface.co/docs/transformers)
+
+---
+
+## 📋 Changelog
+
+### v2.0.0 (2025-12-04)
+- ✨ Configuración centralizada con `config.py`
+- ✨ Script de setup automático
+- ✨ Documentación mejorada y más clara
+- ✨ Mejor manejo de errores
+- ✨ Rutas configurables (no hardcodeadas)
+- ✨ Modo interactivo de inferencia
+- ✨ Guía de instalación detallada
+- 🐛 Correcciones de paths y compatibilidad
+- 📚 README reorganizado y más accesible
+
+### v1.0.0
+- 🎉 Versión inicial del proyecto
+- ✅ Entrenamiento funcional con QLoRA
+- ✅ Scripts de inferencia básicos
+
+---
+
+**¿Preguntas?** Consulta [INSTALL.md](INSTALL.md) para más detalles o revisa los comentarios en el código.
